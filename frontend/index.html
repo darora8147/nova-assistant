@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nova – Personal AI Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0d0f14; --surface:#161920; --surface2:#1e2230; --border:#2a2f3d;
+      --accent:#6c8ef5; --accent2:#a78bfa; --user-bg:#1e2a4a; --text:#e2e4ef;
+      --muted:#6b7280; --success:#34d399; --danger:#f87171;
+      --font:'DM Sans',sans-serif; --mono:'DM Mono',monospace;
+      --radius:14px; --radius-sm:8px;
+    }
+    html,body{height:100%;}
+    body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+
+    /* header */
+    header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:12px;}
+    .header-left{display:flex;align-items:center;gap:12px;}
+    .avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+    .header-info h1{font-size:16px;font-weight:600;}
+    .header-info p{font-size:12px;color:var(--muted);margin-top:1px;}
+    .status-badge{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);transition:all .3s;}
+    .status-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:background .3s;}
+    .status-badge.online{color:var(--success);border-color:#134e3780;}
+    .status-badge.online .dot{background:var(--success);box-shadow:0 0 6px var(--success);}
+    .status-badge.offline{color:#fb923c;border-color:#431a0380;}
+    .status-badge.offline .dot{background:#fb923c;}
+    .status-badge.error{color:var(--danger);border-color:#7f1d1d80;}
+    .status-badge.error .dot{background:var(--danger);}
+    .header-right{display:flex;align-items:center;gap:8px;}
+    .btn-icon{width:34px;height:34px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;transition:all .2s;}
+    .btn-icon:hover{background:var(--border);color:var(--text);}
+
+    /* memory bar */
+    .memory-bar{padding:6px 24px;background:var(--surface);border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap;}
+    .memory-bar span{display:flex;align-items:center;gap:4px;}
+    .memory-bar strong{color:var(--accent);}
+
+    /* ollama warning */
+    #ollama-warning{display:none;padding:10px 24px;background:#7c1d1d30;border-bottom:1px solid #f8717140;font-size:12px;color:var(--danger);align-items:center;gap:8px;flex-shrink:0;}
+    #ollama-warning.show{display:flex;}
+
+    /* chat */
+    #chat-window{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px;scroll-behavior:smooth;}
+    #chat-window::-webkit-scrollbar{width:5px;}
+    #chat-window::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+    /* messages */
+    .msg-group{display:flex;gap:12px;max-width:820px;width:100%;animation:fadeIn .25s ease;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .msg-group.user{align-self:flex-end;flex-direction:row-reverse;}
+    .msg-group.bot{align-self:flex-start;}
+    .msg-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;margin-top:2px;}
+    .msg-group.user .msg-avatar{background:var(--user-bg);border:1px solid var(--accent);color:var(--accent);}
+    .msg-group.bot  .msg-avatar{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+    .msg-body{display:flex;flex-direction:column;gap:4px;min-width:0;}
+    .msg-meta{font-size:11px;color:var(--muted);display:flex;gap:8px;align-items:center;}
+    .msg-group.user .msg-meta{flex-direction:row-reverse;}
+    .msg-bubble{padding:12px 16px;border-radius:var(--radius);line-height:1.65;font-size:14.5px;max-width:680px;word-break:break-word;}
+    .msg-group.user .msg-bubble{background:var(--user-bg);border:1px solid #2a3d70;border-bottom-right-radius:4px;color:#c9d8ff;}
+    .msg-group.bot  .msg-bubble{background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:4px;}
+
+    /* streaming cursor */
+    .streaming-cursor::after{content:'▌';animation:blink-cursor .7s step-end infinite;color:var(--accent);}
+    @keyframes blink-cursor{0%,100%{opacity:1}50%{opacity:0}}
+
+    /* markdown */
+    .msg-bubble p{margin-bottom:8px;} .msg-bubble p:last-child{margin-bottom:0;}
+    .msg-bubble ul,.msg-bubble ol{padding-left:20px;margin-bottom:8px;}
+    .msg-bubble li{margin-bottom:4px;}
+    .msg-bubble strong{color:#fff;font-weight:600;}
+    .msg-bubble em{color:var(--accent2);}
+    .msg-bubble code:not(pre code){font-family:var(--mono);font-size:13px;background:#0d0f14;border:1px solid var(--border);padding:1px 6px;border-radius:4px;color:#f9a8d4;}
+    .msg-bubble pre{background:#0d1117;border:1px solid var(--border);border-radius:var(--radius-sm);overflow-x:auto;margin:10px 0;}
+    .msg-bubble pre code{font-family:var(--mono);font-size:13px;padding:14px;display:block;}
+    .msg-bubble h1,.msg-bubble h2,.msg-bubble h3{color:#fff;font-weight:600;margin:12px 0 6px;}
+    .msg-bubble blockquote{border-left:3px solid var(--accent);padding-left:12px;color:var(--muted);margin:8px 0;}
+    .msg-bubble a{color:var(--accent);}
+    .msg-bubble table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px;}
+    .msg-bubble th{background:var(--surface2);padding:6px 10px;border:1px solid var(--border);}
+    .msg-bubble td{padding:6px 10px;border:1px solid var(--border);}
+    .msg-bubble tr:nth-child(even) td{background:#0d0f1480;}
+
+    /* retry banner */
+    .retry-btn{font-size:11px;padding:3px 8px;border:1px solid var(--danger);border-radius:4px;background:transparent;color:var(--danger);cursor:pointer;margin-top:6px;}
+    .retry-btn:hover{background:#7f1d1d30;}
+
+    /* typing */
+    #typing{display:none;align-self:flex-start;padding:10px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);border-bottom-left-radius:4px;gap:5px;align-items:center;}
+    #typing.active{display:flex;}
+    .typing-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:blink 1.2s infinite;}
+    .typing-dot:nth-child(2){animation-delay:.2s;}
+    .typing-dot:nth-child(3){animation-delay:.4s;}
+    @keyframes blink{0%,80%,100%{opacity:.3;transform:scale(1)}40%{opacity:1;transform:scale(1.2)}}
+
+    /* welcome */
+    #welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;text-align:center;}
+    .welcome-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 0 40px #6c8ef540;margin-bottom:8px;}
+    #welcome h2{font-size:22px;font-weight:600;color:#fff;}
+    #welcome p{color:var(--muted);font-size:14px;max-width:380px;line-height:1.6;}
+    .quick-prompts{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:8px;}
+    .quick-btn{padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:13px;font-family:var(--font);cursor:pointer;transition:all .2s;}
+    .quick-btn:hover{border-color:var(--accent);color:var(--accent);background:#6c8ef510;}
+
+    /* input */
+    footer{padding:16px 24px 20px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;}
+    .input-row{display:flex;gap:10px;align-items:flex-end;max-width:860px;margin:0 auto;}
+    #user-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:14.5px;padding:12px 16px;resize:none;min-height:48px;max-height:140px;line-height:1.5;transition:border-color .2s;outline:none;}
+    #user-input:focus{border-color:var(--accent);}
+    #user-input::placeholder{color:var(--muted);}
+    #send-btn{width:48px;height:48px;border-radius:var(--radius);border:none;background:var(--accent);color:#fff;font-size:18px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+    #send-btn:hover:not(:disabled){background:#5577e0;transform:scale(1.05);}
+    #send-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+    .input-hint{text-align:center;font-size:11px;color:var(--muted);margin-top:8px;}
+
+    /* toast */
+    #toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 18px;border-radius:20px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .3s;z-index:100;}
+    #toast.show{opacity:1;}
+
+    /* perf panel */
+    #perf-panel{display:none;position:fixed;bottom:80px;right:20px;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;min-width:220px;box-shadow:0 4px 24px #00000060;}
+    #perf-panel.show{display:block;}
+    #perf-panel h3{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;}
+    .perf-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:12px;font-size:12px;}
+    .perf-label{color:var(--muted);}
+    .perf-bar-wrap{flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;}
+    .perf-bar{height:100%;border-radius:4px;transition:width .5s ease;}
+    .perf-bar.safe{background:var(--success);}
+    .perf-bar.warn{background:#fb923c;}
+    .perf-bar.danger{background:var(--danger);}
+    .perf-val{min-width:36px;text-align:right;font-family:var(--mono);color:var(--text);}
+    .perf-tip{font-size:11px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--border);line-height:1.5;}
+
+    /* jobs panel */
+    #jobs-panel{display:none;position:fixed;top:0;right:0;height:100vh;width:420px;z-index:300;background:var(--surface);border-left:1px solid var(--border);overflow-y:auto;flex-direction:column;}
+    #jobs-panel.show{display:flex;}
+    .jobs-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--surface);}
+    .jobs-header h2{font-size:15px;font-weight:600;}
+    .jobs-stat-row{display:flex;gap:10px;padding:16px 20px;flex-shrink:0;}
+    .jobs-stat{flex:1;background:var(--surface2);border-radius:var(--radius-sm);padding:12px;text-align:center;}
+    .jobs-stat .num{font-size:24px;font-weight:700;color:var(--accent);}
+    .jobs-stat .lbl{font-size:11px;color:var(--muted);margin-top:2px;}
+    .jobs-actions{padding:0 20px 16px;display:flex;gap:8px;}
+    .jobs-actions button{flex:1;padding:9px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:13px;font-family:var(--font);cursor:pointer;transition:all .2s;}
+    .jobs-actions button:hover{background:var(--border);}
+    .jobs-actions button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+    .jobs-actions button.primary:hover{background:#5577e0;}
+    #jobs-list{flex:1;overflow-y:auto;padding:0 20px 20px;}
+    .job-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:10px;transition:border-color .2s;}
+    .job-card:hover{border-color:var(--accent);}
+    .job-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+    .job-title{font-size:13px;font-weight:600;color:var(--text);line-height:1.4;}
+    .job-company{font-size:12px;color:var(--muted);margin-top:3px;}
+    .job-score{flex-shrink:0;font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px;}
+    .job-score.high{background:#14532d50;color:#4ade80;}
+    .job-score.mid{background:#78350f50;color:#fbbf24;}
+    .job-score.low{background:#1e293b;color:var(--muted);}
+    .job-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+    .job-tag{font-size:10px;padding:2px 7px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);}
+    .job-link{font-size:11px;color:var(--accent);text-decoration:none;margin-top:8px;display:inline-block;}
+    #jobs-status{padding:0 20px 12px;font-size:12px;color:var(--muted);text-align:center;}
+    .scraping-anim::after{content:'';animation:dots 1.5s infinite;}
+    @keyframes dots{0%{content:''} 33%{content:'.'} 66%{content:'..'} 100%{content:'...'}}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="avatar">🤖</div>
+    <div class="header-info">
+      <h1 id="assistant-name">Nova</h1>
+      <p>Personal AI Assistant</p>
+    </div>
+  </div>
+  <div id="status-badge" class="status-badge">
+    <div class="dot"></div>
+    <span id="status-text">Connecting…</span>
+  </div>
+  <div class="header-right">
+    <button class="btn-icon" onclick="showJobsPanel()" title="Job Agent">💼</button>
+    <button class="btn-icon" id="perf-btn" onclick="togglePerf()" title="Performance monitor">📊</button>
+    <button class="btn-icon" onclick="clearChat()" title="New chat">🗑️</button>
+    <button class="btn-icon" onclick="exportChat()" title="Export chat">💾</button>
+  </div>
+</header>
+
+<div class="memory-bar">
+  <span>💬 Session: <strong id="mem-session">0</strong> msgs</span>
+  <span>🧠 Memories: <strong id="mem-total">0</strong></span>
+  <span>⚡ <strong id="mem-mode">—</strong></span>
+  <span id="model-name" style="margin-left:auto;"></span>
+</div>
+
+<!-- Ollama not running warning -->
+<div id="ollama-warning">
+  ⚠️ Ollama is not running. Start it by running <code style="background:#ffffff15;padding:2px 6px;border-radius:4px;">ollama serve</code> in a terminal, then refresh this page.
+</div>
+
+<div id="chat-window">
+  <div id="welcome">
+    <div class="welcome-avatar">🤖</div>
+    <h2>Hi, I'm <span id="welcome-name">Nova</span>!</h2>
+    <p>Your personal AI assistant — works online and offline. Ask me anything!</p>
+    <div class="quick-prompts">
+      <button class="quick-btn" onclick="sendQuick(this)">What can you do?</button>
+      <button class="quick-btn" onclick="sendQuick(this)">What's today's date and time?</button>
+      <button class="quick-btn" onclick="sendQuick(this)">Calculate 15% tip on ₹2500</button>
+      <button class="quick-btn" onclick="sendQuick(this)">Write a short motivational quote</button>
+      <button class="quick-btn" onclick="sendQuick(this)">Search for latest AI news</button>
+    </div>
+  </div>
+</div>
+
+<div id="typing">
+  <div class="typing-dot"></div>
+  <div class="typing-dot"></div>
+  <div class="typing-dot"></div>
+</div>
+
+<footer>
+  <div class="input-row">
+    <textarea id="user-input" rows="1" placeholder="Message Nova…"></textarea>
+    <button id="send-btn" onclick="sendMessage()">➤</button>
+  </div>
+  <div class="input-hint">Enter to send · Shift+Enter for new line</div>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+marked.setOptions({ breaks: true, gfm: true });
+
+let isLoading = false;
+let lastUserMessage = "";
+
+// ── Utilities ─────────────────────────────────────────────────────────────
+function now() { return new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}); }
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2500);
+}
+function hideWelcome() { const w=document.getElementById("welcome"); if(w) w.remove(); }
+function scrollBottom() { const w=document.getElementById("chat-window"); w.scrollTop=w.scrollHeight; }
+function escapeHtml(t) { return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// ── Append a completed message ─────────────────────────────────────────────
+function appendMessage(role, content, mode) {
+  hideWelcome();
+  const isUser = role === "user";
+  const group  = document.createElement("div");
+  group.className = `msg-group ${isUser ? "user" : "bot"}`;
+  const modeTag = !isUser && mode ? `<span>${mode === "online" ? "🌐" : "📴"}</span>` : "";
+  group.innerHTML = `
+    <div class="msg-avatar">${isUser ? "👤" : "🤖"}</div>
+    <div class="msg-body">
+      <div class="msg-meta"><span>${isUser?"You":"Nova"}</span><span>${now()}</span>${modeTag}</div>
+      <div class="msg-bubble">${isUser ? escapeHtml(content) : marked.parse(content)}</div>
+    </div>`;
+  document.getElementById("chat-window").appendChild(group);
+  group.querySelectorAll("pre code").forEach(hljs.highlightElement);
+  scrollBottom();
+  return group;
+}
+
+// ── Create a streaming bot bubble (returns live element) ──────────────────
+function createStreamingBubble() {
+  hideWelcome();
+  const group = document.createElement("div");
+  group.className = "msg-group bot";
+  group.innerHTML = `
+    <div class="msg-avatar">🤖</div>
+    <div class="msg-body">
+      <div class="msg-meta"><span>Nova</span><span>${now()}</span></div>
+      <div class="msg-bubble streaming-cursor" id="stream-bubble"></div>
+    </div>`;
+  document.getElementById("chat-window").appendChild(group);
+  scrollBottom();
+  return group;
+}
+
+// ── Send with streaming (FIX: tokens appear as they arrive) ──────────────
+async function sendMessage() {
+  if (isLoading) return;
+  const input = document.getElementById("user-input");
+  const message = input.value.trim();
+  if (!message) return;
+
+  lastUserMessage = message;
+  input.value = "";
+  input.style.height = "48px";
+  setLoading(true);
+
+  appendMessage("user", message);
+
+  const streamGroup = createStreamingBubble();
+  const bubble = document.getElementById("stream-bubble");
+  let rawText = "";
+
+  try {
+    const res = await fetch("/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const lines = decoder.decode(value).split("\n");
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.token) {
+            rawText += data.token;
+            // Show markdown-rendered live text
+            bubble.innerHTML = marked.parse(rawText);
+            scrollBottom();
+          }
+          if (data.done) {
+            bubble.classList.remove("streaming-cursor");
+            bubble.querySelectorAll("pre code").forEach(hljs.highlightElement);
+            if (data.mode) updateStatus(data.mode);
+            fetchStats();
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (err) {
+    // FIX: show error inline + retry button instead of silent failure
+    bubble.classList.remove("streaming-cursor");
+    bubble.innerHTML = `
+      <span style="color:var(--danger)">⚠️ Connection failed. Is the server running?</span><br>
+      <small style="color:var(--muted)">${err.message}</small>
+      <br><button class="retry-btn" onclick="retryLast()">↺ Retry</button>`;
+    showToast("Failed – check server is running");
+  } finally {
+    setLoading(false);
+    input.focus();
+  }
+}
+
+function retryLast() {
+  if (!lastUserMessage) return;
+  document.getElementById("user-input").value = lastUserMessage;
+  sendMessage();
+}
+
+function sendQuick(btn) {
+  document.getElementById("user-input").value = btn.textContent;
+  sendMessage();
+}
+
+function setLoading(state) {
+  isLoading = state;
+  document.getElementById("send-btn").disabled = state;
+}
+
+// ── Clear chat ────────────────────────────────────────────────────────────
+async function clearChat() {
+  try { await fetch("/clear", { method: "POST" }); } catch (_) {}
+  document.getElementById("chat-window").innerHTML = `
+    <div id="welcome">
+      <div class="welcome-avatar">🤖</div>
+      <h2>Fresh start!</h2>
+      <p>What would you like to talk about?</p>
+      <div class="quick-prompts">
+        <button class="quick-btn" onclick="sendQuick(this)">What can you do?</button>
+        <button class="quick-btn" onclick="sendQuick(this)">What's today's date?</button>
+        <button class="quick-btn" onclick="sendQuick(this)">Calculate 15% of 2500</button>
+      </div>
+    </div>`;
+  showToast("Chat cleared ✓");
+  fetchStats();
+}
+
+// ── Export ────────────────────────────────────────────────────────────────
+async function exportChat() {
+  try {
+    const data = await (await fetch("/history")).json();
+    if (!data.history.length) { showToast("Nothing to export yet"); return; }
+    const text = data.history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n\n---\n\n");
+    const a = Object.assign(document.createElement("a"), {
+      href: URL.createObjectURL(new Blob([text], {type:"text/plain"})),
+      download: `nova-chat-${Date.now()}.txt`,
+    });
+    a.click();
+    showToast("Chat exported ✓");
+  } catch (_) { showToast("Export failed"); }
+}
+
+// ── Status ────────────────────────────────────────────────────────────────
+function updateStatus(mode) {
+  const badge = document.getElementById("status-badge");
+  const text  = document.getElementById("status-text");
+  badge.className = `status-badge ${mode}`;
+  text.textContent = mode === "online" ? "Online" : "Offline";
+}
+
+async function fetchStats() {
+  try {
+    const data = await (await fetch("/status")).json();
+    document.getElementById("mem-session").textContent = data.session_messages;
+    document.getElementById("mem-total").textContent   = data.total_memories;
+    document.getElementById("mem-mode").textContent    = data.mode === "online" ? "🌐 Cloud" : "📴 Local";
+    document.getElementById("assistant-name").textContent = data.assistant_name;
+    const wn = document.getElementById("welcome-name");
+    if (wn) wn.textContent = data.assistant_name;
+    document.getElementById("model-name").textContent =
+      data.mode === "online" ? data.online_model : data.offline_model;
+    updateStatus(data.mode);
+
+    // FIX: show Ollama warning if offline and Ollama not running
+    const warn = document.getElementById("ollama-warning");
+    if (data.mode === "offline" && data.ollama_running === false) {
+      warn.classList.add("show");
+    } else {
+      warn.classList.remove("show");
+    }
+  } catch (_) {
+    document.getElementById("status-badge").className = "status-badge error";
+    document.getElementById("status-text").textContent = "Server offline";
+  }
+}
+
+// ── Input auto-resize ─────────────────────────────────────────────────────
+const inp = document.getElementById("user-input");
+inp.addEventListener("input", function () {
+  this.style.height = "auto";
+  this.style.height = Math.min(this.scrollHeight, 140) + "px";
+});
+inp.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+
+
+// ── Jobs Panel ────────────────────────────────────────────────────────────────
+function showJobsPanel() {
+  document.getElementById("jobs-panel").classList.add("show");
+  loadJobStats();
+  loadJobs();
+}
+function closeJobsPanel() {
+  document.getElementById("jobs-panel").classList.remove("show");
+}
+
+async function loadJobStats() {
+  try {
+    const d = await (await fetch("/jobs/stats")).json();
+    document.getElementById("js-found").textContent   = d.total_found   ?? 0;
+    document.getElementById("js-matched").textContent = d.total_scored  ?? 0;
+    document.getElementById("js-applied").textContent = d.total_applied ?? 0;
+  } catch (_) {}
+}
+
+let _currentTab = 'new';
+
+function switchTab(tab) {
+  _currentTab = tab;
+  document.getElementById('tab-new').style.background     = tab === 'new'     ? 'var(--accent)' : 'var(--surface2)';
+  document.getElementById('tab-new').style.color          = tab === 'new'     ? '#fff'          : 'var(--muted)';
+  document.getElementById('tab-applied').style.background = tab === 'applied' ? 'var(--accent)' : 'var(--surface2)';
+  document.getElementById('tab-applied').style.color      = tab === 'applied' ? '#fff'          : 'var(--muted)';
+  loadJobs();
+}
+
+function _jobCard(j, showApply) {
+  const sc = j.match_score || 0;
+  const scoreClass = sc >= 75 ? "high" : sc >= 55 ? "mid" : "low";
+  const applyBtn = showApply
+    ? `<button onclick="markApplied('${j.job_id}')" style="font-size:11px;padding:3px 10px;border:1px solid var(--success);border-radius:4px;background:transparent;color:var(--success);cursor:pointer;margin-top:6px;margin-left:8px;">✓ Mark Applied</button>`
+    : `<span style="font-size:11px;color:var(--muted);margin-top:6px;display:inline-block;">Applied ${j.applied_at ? new Date(j.applied_at).toLocaleDateString('en-IN') : ''}</span>`;
+  return `<div class="job-card" id="jcard-${j.job_id}">
+    <div class="job-card-top">
+      <div style="min-width:0;">
+        <div class="job-title">${j.title || "—"}</div>
+        <div class="job-company">${j.company || ""}${j.location ? " · "+j.location : ""}</div>
+      </div>
+      <span class="job-score ${scoreClass}">${sc}%</span>
+    </div>
+    <div class="job-meta">
+      <span class="job-tag">${j.platform||""}</span>
+      ${j.work_mode ? '<span class="job-tag">'+j.work_mode+'</span>' : ""}
+      ${j.salary    ? '<span class="job-tag">'+j.salary+'</span>'    : ""}
+      ${j.experience? '<span class="job-tag">'+j.experience+'</span>': ""}
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+      ${j.url ? '<a class="job-link" href="'+j.url+'" '+(j.platform==="linkedin"?'':'target="_blank"')+'>View Job →</a>' : ""}
+      ${applyBtn}
+    </div>
+  </div>`;
+}
+
+async function markApplied(jobId) {
+  try {
+    await fetch('/jobs/apply', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({job_id: jobId})});
+    loadJobs();
+    loadJobStats();
+    showToast("Marked as applied ✓");
+  } catch(_) {}
+}
+
+async function loadJobs() {
+  const list = document.getElementById("jobs-list");
+  try {
+    const endpoint = _currentTab === 'applied' ? '/jobs/list?status=applied&limit=100' : '/jobs/list?status=found&limit=50';
+    const d = await (await fetch(endpoint)).json();
+    if (!d.jobs || d.jobs.length === 0) {
+      list.innerHTML = _currentTab === 'applied'
+        ? '<div style="text-align:center;color:var(--muted);padding:40px;font-size:13px;">No applied jobs yet.<br>Click "Mark Applied" on any job.</div>'
+        : '<div style="text-align:center;color:var(--muted);padding:40px;font-size:13px;">No new jobs found today yet.<br>Click "Scrape Now" to start.</div>';
+      return;
+    }
+    list.innerHTML = d.jobs.map(j => _jobCard(j, _currentTab === 'new')).join("");
+  } catch(_) {}
+}
+
+async function scrapeNow() {
+  const status = document.getElementById("jobs-status");
+  status.innerHTML = '<span class="scraping-anim">Scraping jobs</span> (runs in background, may take 1-2 min)';
+  try {
+    await fetch("/jobs/scrape", { method: "POST" });
+    setTimeout(() => { loadJobStats(); loadJobs(); status.textContent = ""; }, 90000);
+    setTimeout(() => { loadJobStats(); loadJobs(); }, 30000);
+  } catch (_) { status.textContent = "Error starting scrape."; }
+}
+
+async function sendReportNow() {
+  const status = document.getElementById("jobs-status");
+  status.textContent = "Sending email report...";
+  try {
+    const d = await (await fetch("/jobs/report", { method: "POST" })).json();
+    status.textContent = d.status === "sent" ? "✅ Report sent to your Gmail!" : "❌ Send failed — check Gmail config in profile.json";
+    setTimeout(() => status.textContent = "", 5000);
+  } catch (_) { status.textContent = "Error sending report."; }
+}
+
+// ── Performance monitor ───────────────────────────────────────────────────
+function togglePerf() {
+  document.getElementById("perf-panel").classList.toggle("show");
+}
+
+async function fetchSysInfo() {
+  try {
+    const d = await (await fetch("/sysinfo")).json();
+    if (d.error) return;
+
+    const cpuPct = d.cpu_pct || 0;
+    const ramPct = d.ram_pct || 0;
+
+    const cpuBar = document.getElementById("cpu-bar");
+    const ramBar = document.getElementById("ram-bar");
+    cpuBar.style.width = cpuPct + "%";
+    ramBar.style.width = ramPct + "%";
+
+    const barClass = pct => pct < 60 ? "perf-bar safe" : pct < 80 ? "perf-bar warn" : "perf-bar danger";
+    cpuBar.className = barClass(cpuPct);
+    ramBar.className = barClass(ramPct);
+
+    document.getElementById("cpu-val").textContent = cpuPct.toFixed(0) + "%";
+    document.getElementById("ram-val").textContent = ramPct.toFixed(0) + "%";
+    document.getElementById("ram-abs").textContent = d.ram_used_gb + " / " + d.ram_total_gb + " GB";
+
+    let tip = "";
+    if (ramPct > 85) tip = "⚠️ RAM critical! Run: bash switch_model.sh and choose phi3:mini";
+    else if (ramPct > 70) tip = "RAM is high. Consider phi3:mini or gemma2:2b for better speed.";
+    else if (cpuPct > 85) tip = "CPU very busy. Lower OLLAMA_NUM_THREAD in .env";
+    else tip = "✅ System load is healthy.";
+    document.getElementById("perf-tip").textContent = tip;
+  } catch (_) {}
+}
+
+setInterval(fetchSysInfo, 3000);
+fetchSysInfo();
+
+// ── Init ──────────────────────────────────────────────────────────────────
+fetchStats();
+setInterval(fetchStats, 20000);
+inp.focus();
+</script>
+
+<!-- PERFORMANCE PANEL -->
+<div id="perf-panel">
+  <h3>System Load</h3>
+  <div class="perf-row">
+    <span class="perf-label">CPU</span>
+    <div class="perf-bar-wrap"><div id="cpu-bar" class="perf-bar safe" style="width:0%"></div></div>
+    <span class="perf-val" id="cpu-val">—</span>
+  </div>
+  <div class="perf-row">
+    <span class="perf-label">RAM</span>
+    <div class="perf-bar-wrap"><div id="ram-bar" class="perf-bar safe" style="width:0%"></div></div>
+    <span class="perf-val" id="ram-val">—</span>
+  </div>
+  <div class="perf-row" style="margin-bottom:0">
+    <span class="perf-label">RAM used</span>
+    <span class="perf-val" id="ram-abs" style="color:var(--muted)">— / — GB</span>
+  </div>
+  <div class="perf-tip" id="perf-tip"></div>
+</div>
+
+
+<!-- JOBS PANEL -->
+<div id="jobs-panel">
+  <div class="jobs-header">
+    <h2>💼 Job Agent</h2>
+    <button class="btn-icon" onclick="closeJobsPanel()">✕</button>
+  </div>
+  <div class="jobs-stat-row">
+    <div class="jobs-stat"><div class="num" id="js-found">—</div><div class="lbl">Found Today</div></div>
+    <div class="jobs-stat"><div class="num" id="js-matched">—</div><div class="lbl">Good Matches</div></div>
+    <div class="jobs-stat"><div class="num" id="js-applied">—</div><div class="lbl">Applied</div></div>
+  </div>
+  <div class="jobs-actions">
+    <button class="primary" onclick="scrapeNow()">🔍 Scrape Now</button>
+    <button onclick="sendReportNow()">📧 Send Report</button>
+    <button onclick="loadJobs()">🔄 Refresh</button>
+  </div>
+  <div id="jobs-status"></div>
+  <div id="jobs-list"><div style="text-align:center;color:var(--muted);padding:40px;font-size:13px;">Click "Scrape Now" to find jobs.</div></div>
+</div>
+
+</body>
+</html>
+<script>
+// Patch: open LinkedIn jobs in same tab so logged-in session is used
+(function() {
+  const _orig = document.createElement.bind(document);
+  document.addEventListener('click', function(e) {
+    const a = e.target.closest('a[href*="linkedin.com/jobs"]');
+    if (a) {
+      e.preventDefault();
+      // Open in same tab so Chrome uses your existing LinkedIn login
+      window.location.href = a.href;
+    }
+  });
+})();
+</script>

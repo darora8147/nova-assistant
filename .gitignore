@@ -1,0 +1,40 @@
+# Python virtual environment - NEVER commit this (thousands of files)
+venv/
+env/
+.env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Environment variables - contains your API keys and passwords
+.env
+
+# Database files - personal data, regenerated automatically
+memory_db/
+job_agent/jobs.db
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Test outputs
+.pytest_cache/
+htmlcov/
+.coverage

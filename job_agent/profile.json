@@ -1,0 +1,51 @@
+{
+  "name": "Divyam Arora",
+  "email": "divyam.arora94@gmail.com",
+  "notify_email": "divyam.arora94@gmail.com",
+  "gmail_sender": "divyam.arora94@gmail.com",
+  "gmail_app_password": "twbwpkirenxwmren",
+
+  "title": "Frontend Developer",
+  "total_experience_years": 10.9,
+  "relevant_experience_years": 8.5,
+
+  "primary_skills": [
+    "Angular", "React", "JavaScript", "TypeScript", "RxJS", "NgRx", "HTML", "CSS", "SCSS"
+  ],
+  "secondary_skills": [
+    "Tailwind CSS", "Jest", "Angular Material", "AG-Grid", "Vega", "Redux"
+  ],
+
+  "job_titles": [
+    "Frontend Developer", "Angular Developer", "React Developer",
+    "UI Developer", "Senior Frontend Engineer", "Lead Frontend Developer",
+    "Frontend Engineer", "Senior UI Developer"
+  ],
+
+  "search_keywords": [
+    "Senior Angular Developer",
+    "Senior React Developer",
+    "Frontend Developer Angular React",
+    "Senior Frontend Engineer",
+    "Lead Frontend Developer"
+  ],
+
+  "preferred_locations": [
+    "Remote", "Bangalore", "Pune", "Hyderabad", "Mumbai", "India"
+  ],
+
+  "work_mode": ["Remote", "Hybrid"],
+
+  "min_salary_lpa": 30,
+  "experience_filter": "8-13",
+  "match_threshold": 55,
+
+  "blocked_companies": [],
+  "blocked_keywords": [
+    "internship", "fresher", "0-2 years", "entry level",
+    "junior", "trainee", "0 to 1", "1 year"
+  ],
+
+  "schedule_scrape_time": "09:00",
+  "schedule_notify_time": "19:00"
+}
