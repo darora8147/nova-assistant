@@ -28,4 +28,4 @@ echo Starting server at http://127.0.0.1:8000
 echo Press Ctrl+C to stop.
 echo.
 
-python -m uvicorn server:app --host 127.0.0.1 --port 8000 --reload
+venv\Scripts\python.exe -m uvicorn server:app --host 127.0.0.1 --port 8000 --reload
